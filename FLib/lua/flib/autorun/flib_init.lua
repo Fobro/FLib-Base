@@ -145,8 +145,6 @@ end
 	Config Management
 --]]
 
-
-
 if file.Exists( "flib/configs.txt", "DATA" ) then
 	FLib.Config = util.JSONToTable( file.Read( "flib/configs.txt", "DATA" ) )
 else
