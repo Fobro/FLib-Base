@@ -84,12 +84,19 @@ _**Arguments**_
 
 _**Example**_
 
+
 FLib.HotLoad.SourceInSequence( "MenuButtons", {
+
 	{ "main", "https://i.imgur.com/695Hxjv.png", "png" },
+
 	{ "manage", "https://i.imgur.com/I10A7NH.png", "png" },
+
 	{ "analysis", "https://i.imgur.com/4uCuUOt.png", "png"},
+
 	{ "config", "https://i.imgur.com/cpRpoL3.png", "png"},
+
 	{ "develop", "https://i.imgur.com/Sbid91C.png", "png"}
+
 } )
 
 
