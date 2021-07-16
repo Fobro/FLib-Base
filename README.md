@@ -73,6 +73,24 @@ hook.Add( "HUDDraw", "Example", function()
     surface.SetMaterial ( FLib.Resources["loadingIcon"]:GetName() )
 end )
 
+### **FLib.HotLoad.SourceInSequence(**  _sequence identifier_,  _URL Source Table_**)**
+
+Produces an ordered series of resources from a given URL, making sure they download one after another rather than all at once (to prevent lag). You can't add to a sequence once it is started (since it internally measures progress), so try and cram as many needed resources into as few sequences to reduce the amount of coinciding downloads (keep more bandwidth for gameplay)
+
+_**Arguments**_
+-  _sequence identifier_ (string): the name (string index) used to retrieve data on the sequence (no further functions ready)
+- _URL Source Table_ (table): a table containing the order of args needed in a regular URLSource (see example)
+
+
+_**Example**_
+
+FLib.HotLoad.SourceInSequence( "MenuButtons", {
+	{ "main", "https://i.imgur.com/695Hxjv.png", "png" },
+	{ "manage", "https://i.imgur.com/I10A7NH.png", "png" },
+	{ "analysis", "https://i.imgur.com/4uCuUOt.png", "png"},
+	{ "config", "https://i.imgur.com/cpRpoL3.png", "png"},
+	{ "develop", "https://i.imgur.com/Sbid91C.png", "png"}
+} )
 
 
 ## Lua Documentation (Part 2: File Structure)
