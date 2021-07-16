@@ -66,7 +66,9 @@ _**Arguments**_
 _**Example**_
 
 local url = [[https://image.pngaaa.com/324/121324-middle.png]]
+
 FLib.HotLoad.URLSource( "loadingIcon", url, "png" )
+
 hook.Add( "HUDDraw", "Example", function()
     surface.SetMaterial ( FLib.Resources["loadingIcon"]:GetName() )
 end )
