@@ -50,7 +50,7 @@ FLib.Func.AddSharedFile( "modules/mymodule/myserverscript.lua" )
 
 
 
-### **FLib.HotLoad.URLSource( ** _identifier_ **, ** _url_ **, **__filetype__**, **__onLoad__** )**
+### **FLib.HotLoad.URLSource( ** _identifier_,  _url_, __filetype__, __onLoad__** )**
 
 Produces a resource (image, material, data, or sound) and stores it on disk while the user is playing. This functions returns nothing but will produce (depending on the file type)
 - Images will be stored under **FLib.Resources.[_identifier_]**
