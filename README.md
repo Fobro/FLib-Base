@@ -50,7 +50,7 @@ FLib.Func.AddSharedFile( "modules/mymodule/myserverscript.lua" )
 
 
 
-### **FLib.HotLoad.URLSource(**  _identifier_,  _url_, _filetype_, _onLoad_**)**
+### **FLib.HotLoad.URLSource(**  _identifier_,  _url_, _filetype_, _onLoad_ **)**
 
 Produces a resource (image, material, data, or sound) and stores it on disk while the user is playing. This functions returns nothing but will produce (depending on the file type)
 - Images will be stored under **FLib.Resources.[_identifier_]**
@@ -65,7 +65,11 @@ _**Arguments**_
 
 _**Example**_
 
-FLib.Func.AddSharedFile( "modules/mymodule/myserverscript.lua" )
+local url = [[https://image.pngaaa.com/324/121324-middle.png]]
+FLib.HotLoad.URLSource( "loadingIcon", url, "png" )
+hook.Add( "HUDDraw", "Example", function()
+    surface.SetMaterial ( FLib.Resources["loadingIcon"]:GetName() )
+end )
 
 
 
