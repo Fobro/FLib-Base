@@ -48,6 +48,27 @@ _**Example**_
 
 FLib.Func.AddSharedFile( "modules/mymodule/myserverscript.lua" )
 
+
+
+### **FLib.HotLoad.URLSource( ** _identifier_ **, ** _url_ **, **__filetype__**, **__onLoad__** )**
+
+Produces a resource (image, material, data, or sound) and stores it on disk while the user is playing. This functions returns nothing but will produce (depending on the file type)
+- Images will be stored under **FLib.Resources.[_identifier_]**
+- Sounds will be registered in gmods actual sound table under the sound name of the _identifier_ argument
+- Materials will be stored in the same table formatting as the images (FLib.Resources.[_identifier_])
+
+_**Arguments**_
+- _identifier_ (string): the name (string index) used to retrieve the returned object. This had to be done since http is async
+- _url_ (string): a link to the direct file (i.e. imgur.com/example.png)
+- _filetype_ (string): this is really needed for VTF/VMT, but valid filetypes can be found under the gmod wiki page for file.Write
+- _onLoad_ (function): a function that runs when the material is loaded (there is one parameter which is either the object, if material/image, or identifier otherwise)
+
+_**Example**_
+
+FLib.Func.AddSharedFile( "modules/mymodule/myserverscript.lua" )
+
+
+
 ## Lua Documentation (Part 2: File Structure)
 
 In order to add a module to FLib, you need to use the expected file structure. This is pretty relaxed, in that FLib will simply search each folder in "lua/flib/modules" for a file called "autorun.lua". This will be executed as a shared file, so I suggest running the rest of your file initiation from there using the more specified functions (FLib AddServerFile etc)
