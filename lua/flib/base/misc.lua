@@ -56,14 +56,182 @@ FLib.Func.AddSharedFile( "base/concommand.lua" )
 
 ------------------------------------------
 --[[
-	VGUI & Scale Draw
+	VGUI & Scale Draw & Hot Load
 --]]
 
 -- notes: 
 --		- all scaling is done relative to a 1920 x 1080 anchor (most common for games/default)
 --		- all of these are built at some level using surface functions, so changing attributes of drawing can be done there if not specified
 if CLIENT then
-	FLib.Textures = {}
+	FLib.Resources = {}
+
+	
+
+	local extensionTypes = {
+		png = "image",
+		jpeg = "image",
+		jpg = "image",
+		vtf = "material",
+		vmt = "material",
+		mp3 = "sound",
+		wav = "sound",
+		ogg = "sound",
+		txt = "data",
+		dat = "data",
+		csv = "data",
+		xml = "data",
+		json = "data",
+	}
+	FLib.HotLoad ={}
+
+
+	local TypeFunctions = {
+		image = {
+			prepare = function( identifier, filetype ) -- if you wanna fuck around with png parameters, just use the returned material and steal the texture using GetTexture/SetTexture
+				if identifier == "loadingIcon" then
+					FLib.Resources[identifier] = Material( "phoenix_storms/wood" )
+				elseif FLib.Resources["loadingIcon"] then
+					FLib.Resources[identifier] = Material( FLib.Resources["loadingIcon"]:GetTexture( "$basetexture" ):GetName() )
+				else
+					FLib.Resources[identifier] = Material( "phoenix_storms/wood" )
+				end
+				return FLib.Resources[identifier] -- lord knows why, but returning this into itself causes it to actually set the value... Nice? IG?
+			end,
+			load = function( path, identifier, filetype )
+				FLib.Resources[identifier] = Material( path )
+				return FLib.Resources[identifier]
+			end
+		},
+		material = {
+			load = function( path, identifier, filetype )
+				if string.lower(filetype) == "vtf" then -- if vtf, mark the identifier
+					if FLib.Resources[identifier]:GetTexture( "$basetexture" ) == "models/wireframe" then -- if it isn't plain prepared material (this is default installed)
+						FLib.Resources[identifier] = path
+					else
+						FLib.Resources[identifier]:SetTexture( "$basetexture", path )
+					end
+				else -- only VMT is possible
+					if type( FLib.Resources[identifier] ) == "string" then
+						local vmt = Material( path )
+						vmt:SetTexture( "$basetexture", FLib.Resources[identifier]:GetTexture( "$basetexture" ):GetName() )
+						FLib.Resources[identifier] = vmt
+					else
+						FLib.Resources[identifier] = Material( path )
+					end
+				end
+				return FLib.Resources[identifier]
+			end,
+			prepare = function( identifier, filetype )
+				FLib.Resources[identifier] = Material( "models/wireframe" )
+				return FLib.Resources[identifier]
+			end
+		},
+
+		sound = {
+			load = function( path, identifier, filetype )
+				sound.Add( {
+					name = identifier,
+					channel = CHAN_STATIC,
+					volume = 1.0,
+					level = 80,
+					pitch = {95, 110},
+					sound = path
+				} )
+				return identifier
+			end
+		},
+		data = function( path, identifier, filetype )
+			-- idk what to do with this yet tbh
+		end,
+	}
+
+	if not file.Exists( "flib/hotload", "DATA" ) then
+		file.CreateDir( "flib/hotload" )
+	end
+
+	function FLib.HotLoad.URLSource( identifier, url, filetype, onLoad ) -- must be a valid file.Write filtype (example field would be a string, "png" or "mp3")
+		if not identifier or not url or not filetype then
+			FLib.Func.Print( "Failed to create URL source ("..(identifier or "NO NAME FOUND").."). Reason: Missing key parameters" )
+			return
+		end
+		local divide = string.Split( url, "." )
+		local extension = divide[#divide] or "unspec"
+		if extension == "unspec" then -- fall back to predicted filetype if it can't be found in the URL
+			local abort = false
+			extension = filetype
+		end
+		if not extensionTypes[extension] then
+			FLib.Func.Print( "Couldn't load URL source (invalid file type: "..filetype..")" )
+			return
+		end
+		
+		if not file.Exists( "flib/hotload/"..extensionTypes[extension], "DATA" ) then
+			file.CreateDir( "flib/hotload/"..extensionTypes[extension] )
+		end
+		local urlHash = util.CRC( url ) -- identifier for URL in a stable string storage format
+		local path = "flib/hotload/"..extensionTypes[extension].."/" .. urlHash .. "." .. extension
+		if file.Exists( path, "DATA" ) then
+			if TypeFunctions[extensionTypes[extension]]["prepare"] then -- if the load function updates a filler item (i.e. updating a material texture)
+				print("preparing already installed material")
+				FLib.Resources[identifier] = TypeFunctions[extensionTypes[extension]]["prepare"]( identifier, filetype )
+			end
+			FLib.Resources[identifier] = TypeFunctions[extensionTypes[extension]]["load"]( "data/"..path, identifier, filetype )
+			if onLoad then
+				onLoad( FLib.Resources[identifier] or identifier )
+			end
+		else
+			if TypeFunctions[extensionTypes[extension]]["prepare"] then -- if it needs to prep a value before
+				print("preparing for downloaded material")
+				FLib.Resources[identifier] = TypeFunctions[extensionTypes[extension]]["prepare"]( identifier, filetype )
+			end
+			http.Fetch( url, 
+				--onSucc
+				function( content )
+					file.Write( path, content )
+					FLib.Resources[identifier] = TypeFunctions[extensionTypes[extension]]["load"]( "data/"..path, identifier, filetype )
+					
+					if onLoad then
+						onLoad( FLib.Resources[identifier] or identifier )
+					end
+				end, 
+
+				--OnErr
+				function( errString )
+					FLib.Func.Print( "Failed to retrieve source from URL. Reason: "..errString)
+				end
+			)
+		end
+	end
+
+	FLib.HotLoad.ActiveSequence = {}
+	function FLib.HotLoad.SourceInSequence( identifier, LoadTable ) -- identifier is the label to retrieve data by, and entryCount is how many it expects to add
+		FLib.HotLoad.ActiveSequence[identifier] = { ["id"] = identifier, ["curSlot"] = 1, ["maxSlot"] = #LoadTable }
+		for k, v in pairs( LoadTable ) do -- have the identifier set to loading during queue
+			FLib.Func.DPrint( "Preparing to load resource from URL ("..v[2]..")" )
+			FLib.Resources[v[1]] = FLib.Resources["loadingIcon"]
+		end
+		local function NextLoad(  )
+			FLib.HotLoad.ActiveSequence[identifier].curSlot = FLib.HotLoad.ActiveSequence[identifier].curSlot + 1
+			local curslot = FLib.HotLoad.ActiveSequence[identifier].curSlot
+			FLib.Func.DPrint( "Finished downloading, starting next resource ("..LoadTable[curslot][2]..")" )
+			if LoadTable[curslot-1][4] then
+				LoadTable[curslot-1][4]()
+			end
+			if curslot == #LoadTable then
+				FLib.HotLoad.URLSource( LoadTable[curslot][1], LoadTable[curslot][2], LoadTable[curslot][3], LoadTable[curslot][4] )
+			else
+				FLib.HotLoad.URLSource( LoadTable[curslot][1], LoadTable[curslot][2], LoadTable[curslot][3], NextLoad )
+			end
+		end
+		FLib.Func.DPrint( "Starting download with URL ("..LoadTable[1][2]..")" )
+		FLib.HotLoad.URLSource( LoadTable[1][1], LoadTable[1][2], LoadTable[1][3], NextLoad )
+	end
+
+
+	local url = [[https://image.pngaaa.com/324/121324-middle.png]]
+	FLib.HotLoad.URLSource( "loadingIcon", url, "png" ) -- this would be best accessed through FLib.Resources["loadingIcon"]
+
+
 	scaleDraw = {}
 	scaleDraw.Amplifier = ( ScrH()*ScrW() )/( 1920*1080 )
 	scaleDraw.AmplifierX = (ScrW()/1920)
@@ -125,41 +293,6 @@ if CLIENT then
 		surface.CreateFont( name, properties )
 	end
 
-	function FLib.Func.AddURLImage( identifier, url, w, h, time ) -- Imported/resembled to save time from @mattkrins on Github (https://gist.github.com/mattkrins/5455b96631cc2ebdf0e577a71d1a3d54)
-		if not LocalPlayer():IsValid() then 
-			hook.Add( "FLib.PlayerLoaded", "FLib.Textures.LoadImage."..identifier, function()
-				FLib.Func.AddURLImage( identifier, url, w, h, time )
-			end )
-			return
-		end
-		if not url or not w or not h then FLib.Func.DPrint( "Failed to load URL image into library (missing arguments)", true ) return end
-		local HTMLPanel = vgui.Create( "HTML" )
-		HTMLPanel:SetAlpha( 0 )
-		HTMLPanel:SetSize( scaleDraw.Scale( tonumber(w) ), scaleDraw.Scale( tonumber(h) ) )
-		HTMLPanel:OpenURL( url )
-		timer.Simple( 3, function() 
-			if IsValid(HTMLPanel) then
-				if HTMLPanel:GetHTMLMaterial() then
-					local htmlmat = HTMLPanel:GetHTMLMaterial()
-					local finalMat = CreateMaterial("FLib.Textures."..identifier,"UnlitGeneric",{
-					["$basetexture"]= htmlmat:GetName(), 
-					["$vertexalpha"] = 1,
-					})
-					FLib.Textures[identifier] = finalMat
-				else
-					FLib.Textures[identifier] = Material("error")
-				end
-				HTMLPanel:Remove()
-			end
-		end )
-	end
-
-	function FLib.Func.GetURLImage( identifier )
-		return FLib.Textures[identifier]
-	end
-
-	surface.GetImage = FLib.Func.GetURLImage -- quick alias
-	surface.AddImage = FLib.Func.AddURLImage
 
 
 end

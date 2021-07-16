@@ -29,10 +29,6 @@ if SERVER then
 	util.AddNetworkString( "FLib.Menu.Dev.QuickTools.RestartServ" )
 	util.AddNetworkString( "FLib.Menu.Dev.QuickTools.ReloadMap" )
 
-	local function TableToVar( tbl ) -- put this directly into a function where
-
-	end
-
 	net.Receive( "FLib.Menu.Dev.QuickTools.RCON", function( len, ply )
 		if ply:IsAdmin() then
 			local strng = net.ReadString()
@@ -73,7 +69,10 @@ end
 
 local surface = surface -- prevent noise from other surface drawing
 
+
+
 if CLIENT then
+	
 	-- quick lua refresh protection for dev
 	if FLib.Menu then
 		FLib.Func.DPrint( "Handling file refresh" )
@@ -83,6 +82,8 @@ if CLIENT then
 			FLib.Menu.ActivePanels["Main"] = nil
 		end
 	end
+	scaleX = scaleDraw.ScaleX
+	scaleY = scaleDraw.ScaleY
 	scaleDraw.CreateFont( "FLib.Menu.Title", { size = 100, font = "Brush Script MT" } )
 	scaleDraw.CreateFont( "FLib.Menu.CloseButton", { size = 25, font = "Georgia" } )
 	scaleDraw.CreateFont( "FLib.Menu.PageSelection.Button", { size = 25, weight = 1000, font = "Calibri" } )
@@ -92,6 +93,7 @@ if CLIENT then
 	scaleDraw.CreateFont( "FLib.Menu.Dev.LuaEnvironment.SubMenuTitle", { size = 40, font = "Courier New", weight = 750 } )
 	scaleDraw.CreateFont( "FLib.Menu.Dev.LuaEnvironment.SubSubMenuTitle", { size = 30, font = "Courier New", weight = 750 } )
 	scaleDraw.CreateFont( "FLib.Menu.Dev.LuaEnvironment.Buttons", { size = 21, weight = 1000, font = "Calibri" } )
+	scaleDraw.CreateFont( "FLib.Menu.Config.ModulePanel.Title", { size = 25, font = "Stratum2 MD" } )
 
 
 	FLib.Menu = {}
@@ -101,7 +103,7 @@ if CLIENT then
 
 	FLib.Menu.Panels["Main"] = {}
 	function FLib.Menu.Panels.Main:Init()
-		self:SetSize( scaleDraw.ScaleX( 1000 ), scaleDraw.ScaleY( 800 ) )
+		self:SetSize( scaleX( 1000 ), scaleY( 800 ) )
 		self:Center()
 		self:MakePopup()
 		self:SetTitle( "" )
@@ -115,7 +117,7 @@ if CLIENT then
 		draw.NoTexture()
 		scaleDraw.RoundedBox( 10, 0, 0, 1000, 800, Color( 3, 252, 223, 80 ) )
 		scaleDraw.RoundedBox( 5, 7, 7, 986, 786, Color( 41, 43, 43, 255 ) )
-		draw.DrawText( "| FLib Menu |", "FLib.Menu.Title", scaleDraw.ScaleX(500), scaleDraw.ScaleY(30), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
+		draw.DrawText( "| FLib Menu |", "FLib.Menu.Title", scaleX(500), scaleY(30), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
 		surface.SetDrawColor( 0, 0, 0, 255 )
 		scaleDraw.DrawRect( 30, 150, 940, 10 )
 		scaleDraw.DrawRect( 205, 170, 7, 600 )
@@ -136,14 +138,14 @@ if CLIENT then
 
 	FLib.Menu.Panels["CloseMainButton"] = {}
 	function FLib.Menu.Panels.CloseMainButton:Init()
-		self:SetPos( scaleDraw.ScaleX( 780 ), scaleDraw.ScaleY( 60 ) )
-		self:SetSize( scaleDraw.ScaleX( 120 ), scaleDraw.ScaleY( 40 ) )
+		self:SetPos( scaleX( 780 ), scaleY( 60 ) )
+		self:SetSize( scaleX( 120 ), scaleY( 40 ) )
 	end
 
 	function FLib.Menu.Panels.CloseMainButton:Paint()
 		scaleDraw.RoundedBox( 10, 0, 0, 120, 40, Color( 255, 255, 255, 255 ) )
 		self:SetText("")
-		draw.DrawText( "[CLOSE]", "FLib.Menu.CloseButton", scaleDraw.ScaleX( 60 ), scaleDraw.ScaleY( 8 ), Color( 0, 0, 0, 255 ), TEXT_ALIGN_CENTER )
+		draw.DrawText( "[CLOSE]", "FLib.Menu.CloseButton", scaleX( 60 ), scaleY( 8 ), Color( 0, 0, 0, 255 ), TEXT_ALIGN_CENTER )
 	end
 
 	function FLib.Menu.Panels.CloseMainButton:DoClick()
@@ -154,17 +156,52 @@ if CLIENT then
 	vgui.Register( "FLib.Main.CloseButton", FLib.Menu.Panels["CloseMainButton"], "DButton" )
 
 	FLib.Menu.Panels["PageDisplay"] = {}
+	
+
 	function FLib.Menu.Panels.PageDisplay:Init()
-		self:SetPos( scaleDraw.ScaleX( 215 ), scaleDraw.ScaleY( 170 ) )
-		self:SetSize( scaleDraw.ScaleX( 760 ), scaleDraw.ScaleY( 600 ) )
+		self:SetPos( scaleX( 215 ), scaleY( 170 ) )
+		self:SetSize( scaleX( 760 ), scaleY( 600 ) )
+
 		local ScrollBar = self:GetVBar()
 		ScrollBar:SetHideButtons( true )
+		local posX, posY = ScrollBar:GetPos()
+		ScrollBar:SetPos( posX, posY )
+		local sx, sy = ScrollBar:GetSize()
+		local x = sx-3
+		local scrollExpSpeed = 0.01
 		function ScrollBar:Paint( w, h )
-			draw.RoundedBox( 15, 0, 0, w, h, Color( 0, 0, 0, 75 ) )
+			if self:IsHovered() or ScrollBar.btnGrip:IsHovered() then
+				if self.expand then
+					if self.expand + x >= sx then -- topping out expansion
+						x = self.expand + sx
+					else
+						self.expand = self.expand + scrollExpSpeed -- continue growth (speed of iteration)
+						x = x + self.expand
+					end
+				else -- start growth
+					self.expand = 1
+					x = x + self.expand
+				end
+			else
+				if self.expand then 
+					if x - self.expand < 0 then -- bottom out compression
+						self.expand = nil
+						x = sx/2
+					else
+						self.expand = self.expand + scrollExpSpeed -- continue decline
+						x = x - self.expand
+					end
+				else
+					x = sx/2
+				end
+			end
+			draw.RoundedBox( 15, 0, 0, x, h, Color( 0, 0, 0, 75 ) )
 		end
+
 		function ScrollBar.btnGrip:Paint( w, h )
-			draw.RoundedBox( 15, 0, 0, w, h, Color( 0, 0, 0, 200 ) )
+			draw.RoundedBox( 15, 0, 0, x, h, Color( 0, 0, 0, 100 ) )
 		end
+
 		function ScrollBar.btnUp:Paint( w, h )
 
 		end
@@ -181,13 +218,13 @@ if CLIENT then
 	FLib.Menu.Panels["PageSelection"] = {}
 	FLib.Menu.Pages = {}
 	function FLib.Menu.Panels.PageSelection:Init()
-		self:SetPos( scaleDraw.ScaleX( 30 ), scaleDraw.ScaleY( 170 ) )
-		self:SetSize( scaleDraw.ScaleX( 165 ), scaleDraw.ScaleY( 600 ) )
+		self:SetPos( scaleX( 30 ), scaleY( 170 ) )
+		self:SetSize( scaleX( 165 ), scaleY( 600 ) )
 		FLib.Menu.ActivePanels["PageSelectButtons"] = {}
 		local y_stor = 0
 		for order, pageInfo in pairs(FLib.Menu.Pages) do
 			FLib.Menu.ActivePanels["PageSelectButtons"][order] = vgui.Create( "FLib.PageSelection.Button", self )
-			FLib.Menu.ActivePanels["PageSelectButtons"][order]:SetPos( 0, (order-1)*scaleDraw.ScaleY( 60 ) )
+			FLib.Menu.ActivePanels["PageSelectButtons"][order]:SetPos( 0, (order-1)*scaleY( 60 ) )
 
 			-- Paint function for buttons
 			FLib.Menu.ActivePanels.PageSelectButtons[order]["Paint"] = function()
@@ -214,7 +251,7 @@ if CLIENT then
 				else
 					FLib.Menu.ActivePanels.PageSelectButtons[order].iterated = 0
 				end
-				draw.DrawText( pageInfo.dispName, "FLib.Menu.PageSelection.Button", scaleDraw.ScaleX(55), scaleDraw.ScaleY(15), Color( 255, 255, 255, 255 ), TEXT_ALIGN_LEFT )
+				draw.DrawText( pageInfo.dispName, "FLib.Menu.PageSelection.Button", scaleX(55), scaleY(15), Color( 255, 255, 255, 255 ), TEXT_ALIGN_LEFT )
 				surface.SetDrawColor( 255, 255, 255, 255 )
 				scaleDraw.DrawTexturedRect( 6, 8, 40, 40, pageInfo.imageIdentifier )
 
@@ -239,7 +276,7 @@ if CLIENT then
 
 	FLib.Menu.Panels["PageSelectionButton"] = {}
 	function FLib.Menu.Panels.PageSelectionButton:Init()
-		self:SetSize( scaleDraw.ScaleX( 165 ), scaleDraw.ScaleY( 55 ) )
+		self:SetSize( scaleX( 165 ), scaleY( 55 ) )
 		self:SetText("")
 		self:SetPos( 0, 0 )
 	end
@@ -250,7 +287,7 @@ if CLIENT then
 		table.insert( FLib.Menu.Pages, { ["identifier"] = identifier, ["dispName"] = dispName, ["imageIdentifier"] = iconMaterial, ["panel"] = panel } )
 	end
 
-
+	FLib.Menu.ActiveLabels = {}
 	function FLib.Menu.SelectPage( identifier, order )
 		local pageSelected = false
 		for order, pageInfo in pairs( FLib.Menu.Pages ) do -- I know, I know. A cursed for loop rather than an indexed table and "blah blah o^n blah blah", but this is tiny table and code that is run in single iterations, so doesn't matter
@@ -268,18 +305,21 @@ if CLIENT then
 					if pnlKey ~= "Base" then
 						if pnlKey == "Paint" then
 							FLib.Menu.ActivePanels.PageDisplay[pnlKey] = function()
-								func() -- the function stored by the custom panel
-								local mobileText = -- this is only for title text so it moves with scroll panel
-								draw.DrawText(pageInfo.dispName, "FLib.Menu.PageDisplay.Title", scaleDraw.ScaleX(372.5), scaleDraw.ScaleY(15), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
+								func()
+							end
+							local mobileText = FLib.Menu.ActivePanels["PageDisplay"]:Add( "FLib.Menu.QuickText" ) -- label panel that moves on scroll
+							function mobileText:Paint()
+								draw.DrawText(pageInfo.dispName, "FLib.Menu.PageDisplay.Title", scaleX(372.5), scaleY(15), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
 							end
 							foundPaint = true
 						else
 							FLib.Menu.ActivePanels.PageDisplay[pnlKey] = func
 						end
 						if not foundPaint then 
-							FLib.Menu.ActivePanels.PageDisplay["Paint"] = function()
-								draw.DrawText(pageInfo.dispName, "FLib.Menu.PageDisplay.Title", scaleDraw.ScaleX(372.5), scaleDraw.ScaleY(15), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
-							end 
+							local mobileText = FLib.Menu.ActivePanels["PageDisplay"]:Add( "FLib.Menu.QuickText" ) -- label panel that moves on scroll
+							function mobileText:Paint()
+								draw.DrawText(pageInfo.dispName, "FLib.Menu.PageDisplay.Title", scaleX(372.5), scaleY(15), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
+							end
 						end
 					end
 				end
@@ -287,6 +327,18 @@ if CLIENT then
 			end
 		end
 	end
+
+	local quickText = {}
+
+	function quickText:Init()
+		self:SetPos( 0, 0 )
+		self:SetSize( scaleX( 1000 ), scaleY( 78 ) )
+	end
+
+	
+
+
+	vgui.Register( "FLib.Menu.QuickText", quickText, "Panel" )
 
 	--[[
 		EXAMPLES AND DEFAULT FEATURES
@@ -316,15 +368,24 @@ if CLIENT then
 	-- Main page
 	local mainPanel = {}
 
-	function mainPanel:OnSelect()
-	end
+	local message = 
 
-	function mainPanel:Paint()
-		local message = [[FLib is a user friendly means of configuring and compatibalizing addons which are produced or supported
+[[FLib is a user friendly means of configuring and compatibalizing addons which are produced or supported
 by projects developed by Fobro. This primarily a management tool, and will mostly provide utility to
 those who are managing server rather than merely playing it]]
 
-		draw.DrawText(message, "FLib.Menu.PageDisplay.Body", scaleDraw.ScaleX(10), scaleDraw.ScaleY(100), Color( 255, 255, 255, 255 ), TEXT_ALIGN_LEFT )
+	function mainPanel:OnSelect()
+		local textPanel = self:Add( "Panel" )
+		textPanel:SetSize( scaleDraw.Scale( 800 ), scaleDraw.Scale( 500 ) )
+		textPanel:SetPos( 0, 0 )
+		function textPanel:Paint()
+			draw.DrawText(message, "FLib.Menu.PageDisplay.Body", scaleX(10), scaleY(100), Color( 255, 255, 255, 255 ), TEXT_ALIGN_LEFT )
+		end
+		
+	end
+
+	function mainPanel:Paint()
+		
 	end
 
 
@@ -344,8 +405,8 @@ those who are managing server rather than merely playing it]]
 
 	local luaEnvironment = {}
 	function luaEnvironment:Init()
-		self:SetSize( scaleDraw.ScaleX( 700 ), scaleDraw.ScaleY( 300 ) )
-		self:SetPos( scaleDraw.ScaleX( 24 ), scaleDraw.ScaleY( 100 ) )
+		self:SetSize( scaleX( 700 ), scaleY( 300 ) )
+		self:SetPos( scaleX( 24 ), scaleY( 100 ) )
 		FLib.Menu.ActivePanels["DevPanels"]["LuaEnvironment"]["TextEntry"] = vgui.Create( "FLib.Menu.Dev.LuaEnvironment.EntryText", self )
 		FLib.Menu.ActivePanels["DevPanels"]["LuaEnvironment"]["ServerButton"] = vgui.Create( "FLib.Menu.Dev.LuaEnvironment.ServerButton", self )
 		FLib.Menu.ActivePanels["DevPanels"]["LuaEnvironment"]["ClientButton"] = vgui.Create( "FLib.Menu.Dev.LuaEnvironment.ClientButton", self )
@@ -354,15 +415,15 @@ those who are managing server rather than merely playing it]]
 		local x, y = self:GetSize()
 		scaleDraw.RoundedBox( 10, 0, 0, 700, 300, Color( 44, 156, 47, 20 ) )
 		scaleDraw.RoundedBox( 20, 20, 200, 660, 10, Color( 0, 0, 0, 255 ) )
-		draw.DrawText("Lua Environment", "FLib.Menu.Dev.LuaEnvironment.SubMenuTitle", scaleDraw.ScaleX(350), scaleDraw.ScaleY(10), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
+		draw.DrawText("Lua Environment", "FLib.Menu.Dev.LuaEnvironment.SubMenuTitle", scaleX(350), scaleY(10), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
 		
 	end
 
 	FLib.Menu.LuaTEXT = nil
 	local luaEntry = {}
 	function luaEntry:Init()
-		self:SetPos( scaleDraw.ScaleX( 20 ), scaleDraw.ScaleY( 50 ) )
-		self:SetSize( scaleDraw.ScaleX( 660 ), scaleDraw.ScaleY( 140 ) )
+		self:SetPos( scaleX( 20 ), scaleY( 50 ) )
+		self:SetSize( scaleX( 660 ), scaleY( 140 ) )
 		self:SetMultiline( true )
 		self:SetUpdateOnType( true )
 		self:SetTabbingDisabled( true )
@@ -398,15 +459,15 @@ those who are managing server rather than merely playing it]]
 	local luaRunClient = { }
 
 	function luaRunServer:Init()
-		self:SetPos( scaleDraw.ScaleX( 100 ), scaleDraw.ScaleY( 230 ) )
-		self:SetSize( scaleDraw.ScaleX(175 ), scaleDraw.ScaleY( 50 ) )
+		self:SetPos( scaleX( 100 ), scaleY( 230 ) )
+		self:SetSize( scaleX(175 ), scaleY( 50 ) )
 		self:SetText( "" )
 	end
 
 	function luaRunServer:Paint()
 		--scaleDraw.RoundedBox( 8, 0, 0, 175, 50, Color( 247, 22, 22, 100 ) )
 		scaleDraw.RoundedBox( 8, 0, 0, 175, 50, Illuminated( Color( 247, 22, 22, 100 ), 50, self ) )
-		draw.DrawText("EXECUTE SERVER CODE", "FLib.Menu.Dev.LuaEnvironment.Buttons", scaleDraw.ScaleX(87), scaleDraw.ScaleY(15), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
+		draw.DrawText("EXECUTE SERVER CODE", "FLib.Menu.Dev.LuaEnvironment.Buttons", scaleX(87), scaleY(15), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
 	end
 
 	function luaRunServer:DoClick()
@@ -417,14 +478,14 @@ those who are managing server rather than merely playing it]]
 		end
 	end
 	function luaRunClient:Init()
-		self:SetPos( scaleDraw.ScaleX(425 ), scaleDraw.ScaleY( 230 ) )
-		self:SetSize( scaleDraw.ScaleX(175 ), scaleDraw.ScaleY( 50 ) )
+		self:SetPos( scaleX(425 ), scaleY( 230 ) )
+		self:SetSize( scaleX(175 ), scaleY( 50 ) )
 		self:SetText( "" )
 	end
 
 	function luaRunClient:Paint()
 		scaleDraw.RoundedBox( 8, 0, 0, 175, 50, Illuminated( Color( 38, 107, 255, 100 ), 50, self ) )
-		draw.DrawText("EXECUTE CLIENT CODE", "FLib.Menu.Dev.LuaEnvironment.Buttons", scaleDraw.ScaleX(87), scaleDraw.ScaleY(15), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
+		draw.DrawText("EXECUTE CLIENT CODE", "FLib.Menu.Dev.LuaEnvironment.Buttons", scaleX(87), scaleY(15), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
 	end
 
 	function luaRunClient:DoClick()
@@ -442,8 +503,8 @@ those who are managing server rather than merely playing it]]
 
 	local quickTools = {}
 	function quickTools:Init()
-		self:SetSize( scaleDraw.ScaleX(700 ), scaleDraw.ScaleY( 175 ) )
-		self:SetPos( scaleDraw.ScaleX(24 ), scaleDraw.ScaleY( 420 ) )
+		self:SetSize( scaleX(700 ), scaleY( 175 ) )
+		self:SetPos( scaleX(24 ), scaleY( 420 ) )
 		FLib.Menu.ActivePanels["DevPanels"]["QuickTools"]["RCON"] =  {}
 		FLib.Menu.ActivePanels["DevPanels"]["QuickTools"]["RCON"]["Main"] = vgui.Create( "FLib.Menu.Dev.QuickTools.RCON", self )
 		FLib.Menu.ActivePanels["DevPanels"]["QuickTools"]["RestartServ"] = vgui.Create( "FLib.Menu.Dev.QuickTools.RestartServ", self )
@@ -454,15 +515,15 @@ those who are managing server rather than merely playing it]]
 		local x, y = self:GetSize()
 		draw.RoundedBox( 10, 0, 0, x, y, Color( 110, 110, 110, 150 ) )
 		scaleDraw.RoundedBox( 20, 20, 50, 660, 10, Color( 0, 0, 0, 255 ) )
-		draw.DrawText( "Quick Tools", "FLib.Menu.Dev.LuaEnvironment.SubMenuTitle", x/2, scaleDraw.ScaleY(10), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
+		draw.DrawText( "Quick Tools", "FLib.Menu.Dev.LuaEnvironment.SubMenuTitle", x/2, scaleY(10), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
 
 	end
 
 	local RCON = {}
 	FLib.Menu.RCONString = nil
 	function RCON:Init()
-		self:SetPos( scaleDraw.ScaleX(20 ), scaleDraw.ScaleY(70 ) )
-		self:SetSize( scaleDraw.ScaleX(385 ), scaleDraw.ScaleY( 40 ) )
+		self:SetPos( scaleX(20 ), scaleY(70 ) )
+		self:SetSize( scaleX(385 ), scaleY( 40 ) )
 		FLib.Menu.ActivePanels["DevPanels"]["QuickTools"]["RCON"]["Button"] = vgui.Create( "FLib.Menu.Dev.QuickTools.RCON.Button", self )
 		FLib.Menu.ActivePanels["DevPanels"]["QuickTools"]["RCON"]["Text"] = vgui.Create( "FLib.Menu.Dev.QuickTools.RCON.Text", self )
 	end
@@ -474,15 +535,15 @@ those who are managing server rather than merely playing it]]
 
 	local RCONButton = {}
 	function RCONButton:Init()
-		self:SetSize( scaleDraw.ScaleX(113 ), scaleDraw.ScaleY( 30 ) )
-		self:SetPos( scaleDraw.ScaleX(7 ), scaleDraw.ScaleY( 5 ) )
+		self:SetSize( scaleX(113 ), scaleY( 30 ) )
+		self:SetPos( scaleX(7 ), scaleY( 5 ) )
 		self:SetText( "" )
 	end
 
 	function RCONButton:Paint()
 		local x, y = self:GetSize()
-		draw.RoundedBox( 8, 0, 0, x, y, Illuminated( Color( 0, 0, 0, 230 ), 25, self ) )
-		draw.DrawText( "LAUNCH RCON", "FLib.Menu.Dev.LuaEnvironment.Buttons", x/2, scaleDraw.ScaleY( 5 ), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
+		draw.RoundedBox( 6, 0, 0, x, y, Illuminated( Color( 0, 0, 0, 230 ), 25, self ) )
+		draw.DrawText( "LAUNCH RCON", "FLib.Menu.Dev.LuaEnvironment.Buttons", x/2, scaleY( 5 ), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
 	end
 
 	function RCONButton:DoClick()
@@ -496,8 +557,8 @@ those who are managing server rather than merely playing it]]
 
 	local RCONText = {}
 	function RCONText:Init()
-		self:SetSize( scaleDraw.ScaleX(250 ), scaleDraw.ScaleY( 24 ) )
-		self:SetPos( scaleDraw.ScaleX(125 ), scaleDraw.ScaleY( 8.5 ) )
+		self:SetSize( scaleX(250 ), scaleY( 24 ) )
+		self:SetPos( scaleX(125 ), scaleY( 8.5 ) )
 		self:SetUpdateOnType( true )
 		if FLib.Menu.RCONString then
 			self:SetText( FLib.Menu.RCONString )
@@ -525,15 +586,15 @@ those who are managing server rather than merely playing it]]
 
 	local RestartServ = {}
 	function RestartServ:Init()
-		self:SetPos( scaleDraw.ScaleX(415 ), scaleDraw.ScaleY( 70 ) )
-		self:SetSize( scaleDraw.ScaleX(130 ), scaleDraw.ScaleY( 40 ) )
+		self:SetPos( scaleX(415 ), scaleY( 70 ) )
+		self:SetSize( scaleX(130 ), scaleY( 40 ) )
 		self:SetText( "" )
 	end
 
 	function RestartServ:Paint()
 		local x, y = self:GetSize()
 		draw.RoundedBox( 8, 0, 0, x, y, Illuminated( Color( 240, 38, 24, 170 ), 50, self )  )
-		draw.DrawText( "Restart Server","FLib.Menu.Dev.LuaEnvironment.Buttons" , x/2, scaleDraw.ScaleY( 10 ), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
+		draw.DrawText( "Restart Server","FLib.Menu.Dev.LuaEnvironment.Buttons" , x/2, scaleY( 10 ), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
 	end
 
 	function RestartServ:DoClick()
@@ -543,15 +604,15 @@ those who are managing server rather than merely playing it]]
 
 	local ReloadMap = {}
 	function ReloadMap:Init()
-		self:SetPos( scaleDraw.ScaleX( 550 ), scaleDraw.ScaleY( 70 ) )
-		self:SetSize( scaleDraw.ScaleX( 130 ), scaleDraw.ScaleY( 40 ) )
+		self:SetPos( scaleX( 550 ), scaleY( 70 ) )
+		self:SetSize( scaleX( 130 ), scaleY( 40 ) )
 		self:SetText( "" )
 	end
 
 	function ReloadMap:Paint()
 		local x, y = self:GetSize()
 		draw.RoundedBox( 8, 0, 0, x, y, Illuminated( Color( 30, 60, 212, 170 ), 50, self ) )
-		draw.DrawText( "Reload Map","FLib.Menu.Dev.LuaEnvironment.Buttons" , x/2, scaleDraw.ScaleY( 10 ), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
+		draw.DrawText( "Reload Map","FLib.Menu.Dev.LuaEnvironment.Buttons" , x/2, scaleY( 10 ), Color( 255, 255, 255, 255 ), TEXT_ALIGN_CENTER )
 	end
 
 	function ReloadMap:DoClick()
@@ -566,12 +627,119 @@ those who are managing server rather than merely playing it]]
 	vgui.Register( "FLib.Menu.Dev.QuickTools.RCON", RCON, "Panel" )
 	vgui.Register( "FLib.Menu.Dev.QuickTools", quickTools, "Panel" )
 
+	local configPanel = {}
+	function configPanel:OnSelect()
+		FLib.Menu.ActivePanels["Config"] = {}
+		local slot = 0 -- iterator
+		for mod, cfgTable in pairs( FLib.Config ) do
+			slot = slot + 1
+			print("adding mod to config menu: "..mod)
+			local modTitle = string.upper( mod ) 
+			FLib.Menu.ActivePanels["Config"][modTitle] = self:Add( "FLib.Menu.Config.ModulePanel" )
+			FLib.Menu.ActivePanels["Config"][modTitle].slot = slot
+			FLib.Menu.ActivePanels["Config"][modTitle].title = modTitle
+			FLib.Menu.ActivePanels["Config"][modTitle].cfg = cfgTable
+			FLib.Menu.ActivePanels["Config"][modTitle]:SetPos( scaleX( 24 ), scaleY( 50 )+(slot*scaleY(50)) )
+			FLib.Menu.ActivePanels["Config"][modTitle].ExpandButton:SetSize( FLib.Menu.ActivePanels["Config"][modTitle]:GetSize() )
+			FLib.Menu.ActivePanels["Config"][modTitle]:Show()
+		end
+	end
+	function configPanel:Paint()
+		-- do nothing (passive background)
+	end
 
-	FLib.Menu.AddPage( "main", "MAIN", Material( "flib/icons/mainmenu/48_menu.png" ), mainPanel )
-	FLib.Menu.AddPage( "manage", "MANAGE", Material( "flib/icons/mainmenu/50_manage.png" ), mainPanel )
-	FLib.Menu.AddPage( "analysis", "ANALYSIS", Material( "flib/icons/mainmenu/60_analyze.png" ), mainPanel )
-	FLib.Menu.AddPage( "config", "CONFIG", Material( "flib/icons/mainmenu/60_settings.png" ), mainPanel )
-	FLib.Menu.AddPage( "develop", "DEVELOP", Material( "flib/icons/mainmenu/50_dev.png" ), developPanel )
+	local modulePanel = {}
+	function modulePanel:Init()
+		self:Hide()
+		self.ExpandButton = vgui.Create( "FLib.Menu.Config.ModulePanelExpand", self )
+		self:SetSize( scaleX( 700 ), scaleY( 43 ) )
+	end
+	function modulePanel:Paint()
+		local x, y = self:GetSize()
+		draw.RoundedBox( 8, 0, 0, x, y, Color( 255, 255, 255, 255 ) )
+		draw.DrawText( string.sub(self.title, 1, 1)..string.lower(string.sub(self.title, 2)), "FLib.Menu.Config.ModulePanel.Title", x/2, scaleY( 8 ), Color( 0, 0, 0, 255 ), TEXT_ALIGN_CENTER )
+	end
+
+	local expandButton = {}
+	function expandButton:Init()
+		self:SetPos( 0, 0 )
+		self:SetText( "" )
+	end
+
+	function expandButton:Paint()
+
+	end
+
+
+	local isExpanding = nil
+	function expandButton:DoClick()
+		if isExpanding then -- don't let multiple animations happen at once, that might not be the most ideal
+			return
+		end
+		local CurmodulePanel = self:GetParent()
+		CurmodulePanel.ConfigItems = {}
+		for identifier, value in pairs( cfgTable ) do
+			if type(value) == "table" then
+				local CategoryPanel = vgui.Create( "FLib.Menu.Config.CategoryDivider", CurmodulePanel )
+				table.insert( CurmodulePanel.ConfigItems, CategoryPanel )
+				for subidentifier, value in pairs( CurmodulePanel.ConfigItems ) do
+
+				end
+			else
+
+			end
+		end
+
+		local curSlot = CurmodulePanel.slot
+		for modname, panel in pairs( FLib.Menu.ActivePanels["Config"] ) do
+			if panel.slot > buttonSlot then
+				local x, y = panel:GetPos()
+				panel:MoveTo( x, y+expansion  )
+			end
+		end
+	end
+
+	local ConfigCategory = {}
+	function ConfigCategory:Init()
+
+	end
+
+	function ConfigCategory:Paint()
+
+	end
+
+	vgui.Register( "FLib.Menu.Config.Item.Category", ConfigCategory, "Panel" )
+	vgui.Register( "FLib.Menu.Config.ModulePanelExpand", expandButton, "DButton" )
+	vgui.Register( "FLib.Menu.Config.ModulePanel", modulePanel, "Panel" )
+
+	FLib.HotLoad.SourceInSequence( "MenuButtons", {
+		{ "main", "https://i.imgur.com/695Hxjv.png", "png", 
+			function() -- on success function
+				FLib.Menu.AddPage( "main", "MAIN", FLib.Resources["main"], mainPanel )
+			end 
+		},
+		{ "manage", "https://i.imgur.com/I10A7NH.png", "png", 
+			function()
+				FLib.Menu.AddPage( "manage", "MANAGE", FLib.Resources["manage"], mainPanel )
+			end 
+		},
+		{ "analysis", "https://i.imgur.com/4uCuUOt.png", "png", 
+			function()
+				FLib.Menu.AddPage( "analysis", "ANALYSIS", FLib.Resources["analysis"], mainPanel )
+			end 
+		},
+		{ "config", "https://i.imgur.com/cpRpoL3.png", "png", 
+			function()
+				FLib.Menu.AddPage( "config", "CONFIG", FLib.Resources["config"], configPanel )
+			end 
+		},
+		{ "develop", "https://i.imgur.com/Sbid91C.png", "png", 
+			function()
+				FLib.Menu.AddPage( "develop", "DEVELOP", FLib.Resources["develop"], developPanel )
+			end
+		}
+	} )
+
 
 end
 
