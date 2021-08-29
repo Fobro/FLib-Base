@@ -19,7 +19,6 @@ MsgC( Color( 97, 255, 134, 255 ), [[
 ///////// Fobro's Library /////////
 ///////////////////////////////////
 ///////////////////////////////////
-
 ]], Color( 63, 232, 111, 255 ), "Starting FLib...\n" )
 
 ------------------------------------------
@@ -36,17 +35,18 @@ FLib.Info.ActiveStaff = {}
 FLib.Info.Version = "1.0"
 FLib.Info.LastStart = CurTime()
 if SERVER then
-	FLib.Info.Realm = "SERVER"
+	FLib.Info.Realm = "Server"
 	util.AddNetworkString("FLib.Debug.Transmit")
 	util.AddNetworkString("FLib.Debug.InitTransmit")
+	util.AddNetworkString("FLib.Config.ServConf")
 else
-	FLib.Info.Realm = "CLIENT"
+	FLib.Info.Realm = "Client"
 end
 function FLib.Func.Print( message, errorBool )
 	if not errorBool then
-		MsgC( Color( 255, 85, 0 ), "[FLib] "..message.."\n" )
+		MsgC( Color( 255, 170, 0 ), "[FLib] "..message.."\n" )
 	else
-		MsgC( Color( 255, 74, 83 ), "[FLib] "..message.."\n" )
+		MsgC( Color( 255, 170, 0 ), "[FLib] "..message.."\n" )
 	end
 end
 
@@ -180,48 +180,93 @@ end
 	Config Management and initial load
 --]]
 
-if file.Exists( "flib/configs.txt", "DATA" ) then
-	FLib.Config = util.JSONToTable( file.Read( "flib/configs.txt", "DATA" ) )
-else
-	local CONFIGS = {}
-	CONFIGS.main = {
-		["Gamemode"] = "terrortown",
-	}
-	CONFIGS.pointsystem = {
-		["DefaultBalance"] = 500,
-		["Currencies"] = {
-			["Pointshop1"] = true,
-			["Pointshop2"] = true,
-			["DarkRP"] = true
-		},
-		["Salary"] = {
-			["Enabled"] = true,
-			["Interval"] = 30,
-			["Amount"] = 50,
-			["WhileSpectate"] = false
-		},
-		["Rewards"] = {
-			["TTT"] = {
+-- IMPORTANT NOTE. DO NOT STORE ANY ONLINE AUTHENTICATION USING IN GAME MENU OPTIONS. THESE SHOULD BE ENTERED IN THE
+-- "PROTECTED CONFIG" FILE.
+-- (so while I do not know of any vulnerabilities to this, it seems reasonable to avoid networking that sort of information)
 
-			}
-		}
-	}
-	CONFIGS.soundsystem = {
+FLib.Config = {}
+FLib.Config.Client = {}
+FLib.Config.Server = {}
+if file.Exists( "flib/"..FLib.Info.Realm.."config.json", "DATA" ) then
+	FLib.Config[FLib.Info.Realm] = util.JSONToTable( file.Read( "flib/"..FLib.Info.Realm.."config.json", "DATA" ) )
+end
+FLib.Config.LocatedModules = {}
+FLib.Config.LocatedModules[FLib.Info.Realm] = {}
 
-	} 
-
-	FLib.Config = CONFIGS
-	file.Write( "flib/configs.txt", util.TableToJSON(FLib.Config) )
+function FLib.Config.SaveConfig() -- saves config for whatever realm runs it (run on both if the change should be applied to both)
+	file.Write( "flib/"..FLib.Info.Realm.."config.json", util.TableToJSON( FLib.Config[FLib.Info.Realm] ) )
 end
 
+function FLib.Config.Register( modname, realm, cfgTable ) -- this should only be used by addons initiated through FLib file structure (through an autorun.lua file located in modules/)
+	if (SERVER and realm ~= "server") or (CLIENT and realm ~= "client") then return end
+	FLib.Config.LocatedModules[FLib.Info.Realm][modname] = true
+	FLib.Config[FLib.Info.Realm][modname] = cfgTable
+	for cfgID, properties in pairs( FLib.Config[FLib.Info.Realm][modname] ) do
+		if not properties.storedval then
+			properties.storedval = properties.default
+		end
+	end
+end
+
+function FLib.Config.ChangeConfig( modname, realm, key, value ) -- modifies and saves the table to disk (for FLib Menu)
+	FLib.Config[FLib.Info.Realm][modname][key].storedval = value
+end
+
+function FLib.Config.LoadConfig( modname ) -- returns pre-indexed config value table (only stored values)
+	local LCFG = {}
+	for cfgID, inf in pairs( FLib.Config[FLib.Info.Realm][modname] ) do
+		if inf.type ~= "category" then
+			LCFG[cfgID] = inf.storedval
+		end
+	end
+	return LCFG
+end
+
+hook.Add( "FLib.Loaded", "FLib.ConfigSetup", function()
+	for modname, v in pairs( FLib.Config[FLib.Info.Realm] ) do -- remove unregistered addons from config file
+		if not FLib.Config.LocatedModules[FLib.Info.Realm][modname] then
+			FLib.Config[FLib.Info.Realm][modname] = nil
+		end
+	end
+
+	FLib.Config.SaveConfig()
+end )
+
+if SERVER then
+	hook.Add( "FLib.PlayerLoaded", "FLib.Config.AdminInGame", function( ply )
+		if ply:IsAdmin() then
+			net.Start( "FLib.Config.ServConf" )
+				net.WriteTable( FLib.Config.Server )
+			net.Send( ply )
+		end
+	end )
+end
+
+if CLIENT then
+	net.Receive( "FLib.Config.ServConf", function( )
+		FLib.Config.Server = net.ReadTable()
+	end )
+end
+
+FLib.Config.Register( "main", "client", {
+	["CATEGORY_DEBUG"] = { type = "category", display = "Debug" },
+	["DebugGeneral"] = { type = "bool", default = false, label = "Enable/Disable Debug Messaging" },
+	["DebugTransmit"] = { type = "bool", default = false, label = "Enable/Disable Server Debug Broadcast to Admins" }
+} )
+
+FLib.Config.Register( "main", "server", {
+	["CATEGORY_TEST"] = { type = "category", display = "Debug" },
+	["Testone"] = { type = "bool", default = false, label = "Enable/Disable Debug Messaging" },
+	["TestTwo"] = { type = "bool", default = false, label = "Enable/Disable Server Debug Broadcast to Admins" }
+} )
 
 ------------------------------------------
 --[[
-	File initiation
+	Module initiation
 --]]
-FLib.Func.AddSharedFile( "base/autorun.lua" )
+FLib.Func.AddSharedFile( "base/autorun.lua" ) -- loads the base first
 
-local files, directs = file.Find( "flib/modules/*", "LUA" ) -- file scan and registry for modules
+local files, directs = file.Find( "flib/modules/*", "LUA" ) -- file scan and registry for custom modules
 if directs then
 	for k, directory in pairs( directs ) do
 		FLib.Func.DPrint( "Loading module! ("..string.upper(directory)..")" )
@@ -234,3 +279,11 @@ if directs then
 else
 	FLib.Func.DPrint( "Couldn't locate any additional modules to load", true )
 end
+
+
+------------------------------------------
+--[[
+	Finish load
+--]]
+
+hook.Run( "FLib.Loaded" )

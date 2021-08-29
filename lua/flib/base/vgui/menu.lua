@@ -70,8 +70,8 @@ end
 local surface = surface -- prevent noise from other surface drawing
 
 
-
 if CLIENT then
+	
 	
 	-- quick lua refresh protection for dev
 	if FLib.Menu then
@@ -82,8 +82,6 @@ if CLIENT then
 			FLib.Menu.ActivePanels["Main"] = nil
 		end
 	end
-	scaleX = scaleDraw.ScaleX
-	scaleY = scaleDraw.ScaleY
 	scaleDraw.CreateFont( "FLib.Menu.Title", { size = 100, font = "Brush Script MT" } )
 	scaleDraw.CreateFont( "FLib.Menu.CloseButton", { size = 25, font = "Georgia" } )
 	scaleDraw.CreateFont( "FLib.Menu.PageSelection.Button", { size = 25, weight = 1000, font = "Calibri" } )
@@ -94,6 +92,7 @@ if CLIENT then
 	scaleDraw.CreateFont( "FLib.Menu.Dev.LuaEnvironment.SubSubMenuTitle", { size = 30, font = "Courier New", weight = 750 } )
 	scaleDraw.CreateFont( "FLib.Menu.Dev.LuaEnvironment.Buttons", { size = 21, weight = 1000, font = "Calibri" } )
 	scaleDraw.CreateFont( "FLib.Menu.Config.ModulePanel.Title", { size = 25, font = "Stratum2 MD" } )
+	scaleDraw.CreateFont( "FLib.Menu.Config.ModulePanel.RealmLabel", { size = 30, weight = 750, font = "Courier New" } )
 
 
 	FLib.Menu = {}
@@ -286,6 +285,8 @@ if CLIENT then
 	function FLib.Menu.AddPage( identifier, dispName, iconMaterial, panel ) -- the panel will be automatically have the size and position set (with the size being 745*600), DONT USE INIT, USE OnSelect() WHICH IS CUSTOM
 		table.insert( FLib.Menu.Pages, { ["identifier"] = identifier, ["dispName"] = dispName, ["imageIdentifier"] = iconMaterial, ["panel"] = panel } )
 	end
+
+	
 
 	FLib.Menu.ActiveLabels = {}
 	function FLib.Menu.SelectPage( identifier, order )
@@ -628,20 +629,45 @@ those who are managing server rather than merely playing it]]
 	vgui.Register( "FLib.Menu.Dev.QuickTools", quickTools, "Panel" )
 
 	local configPanel = {}
+	local pnlBSlot = {}
+	local expansion = 0
 	function configPanel:OnSelect()
 		FLib.Menu.ActivePanels["Config"] = {}
 		local slot = 0 -- iterator
-		for mod, cfgTable in pairs( FLib.Config ) do
+		for mod, cfgTable in pairs( FLib.Config.Client ) do
 			slot = slot + 1
-			print("adding mod to config menu: "..mod)
 			local modTitle = string.upper( mod ) 
 			FLib.Menu.ActivePanels["Config"][modTitle] = self:Add( "FLib.Menu.Config.ModulePanel" )
 			FLib.Menu.ActivePanels["Config"][modTitle].slot = slot
+			pnlBSlot[slot] = FLib.Menu.ActivePanels["Config"][modTitle]
 			FLib.Menu.ActivePanels["Config"][modTitle].title = modTitle
-			FLib.Menu.ActivePanels["Config"][modTitle].cfg = cfgTable
+			FLib.Menu.ActivePanels["Config"][modTitle].clientCFG = cfgTable
 			FLib.Menu.ActivePanels["Config"][modTitle]:SetPos( scaleX( 24 ), scaleY( 50 )+(slot*scaleY(50)) )
 			FLib.Menu.ActivePanels["Config"][modTitle].ExpandButton:SetSize( FLib.Menu.ActivePanels["Config"][modTitle]:GetSize() )
 			FLib.Menu.ActivePanels["Config"][modTitle]:Show()
+
+
+		end
+
+		if LocalPlayer():IsAdmin() then
+			for mod, cfgTable in pairs( FLib.Config.Server ) do
+				local modTitle = string.upper( mod ) 
+				if FLib.Config.Client[mod] then
+					FLib.Menu.ActivePanels["Config"][modTitle].serverCFG = cfgTable
+				else
+					slot = slot + 1
+					local modTitle = string.upper( mod ) 
+					FLib.Menu.ActivePanels["Config"][modTitle] = self:Add( "FLib.Menu.Config.ModulePanel" )
+					FLib.Menu.ActivePanels["Config"][modTitle].slot = slot
+					FLib.Menu.ActivePanels["Config"][modTitle].slot = slot
+					pnlBSlot[slot] = FLib.Menu.ActivePanels["Config"][modTitle]
+					FLib.Menu.ActivePanels["Config"][modTitle].title = modTitle
+					FLib.Menu.ActivePanels["Config"][modTitle].serverCFG = cfgTable
+					FLib.Menu.ActivePanels["Config"][modTitle]:SetPos( scaleX( 24 ), scaleY( 50 )+(slot*scaleY(50)) )
+					FLib.Menu.ActivePanels["Config"][modTitle].ExpandButton:SetSize( FLib.Menu.ActivePanels["Config"][modTitle]:GetSize() )
+					FLib.Menu.ActivePanels["Config"][modTitle]:Show()
+				end
+			end
 		end
 	end
 	function configPanel:Paint()
@@ -659,6 +685,9 @@ those who are managing server rather than merely playing it]]
 		draw.RoundedBox( 8, 0, 0, x, y, Color( 255, 255, 255, 255 ) )
 		draw.DrawText( string.sub(self.title, 1, 1)..string.lower(string.sub(self.title, 2)), "FLib.Menu.Config.ModulePanel.Title", x/2, scaleY( 8 ), Color( 0, 0, 0, 255 ), TEXT_ALIGN_CENTER )
 	end
+	function modulePanel:Expand(  )
+
+	end
 
 	local expandButton = {}
 	function expandButton:Init()
@@ -670,52 +699,229 @@ those who are managing server rather than merely playing it]]
 
 	end
 
+	local function FirstCaps( strng )
+		return string.upper( string.sub(strng, 1 ) )..string.sub( string.lower(strng), 2 )
+	end
 
-	local isExpanding = nil
+	local ServerLabel = {}
+	function ServerLabel:Init()
+		self:SetSize( scaleX( 670 ), scaleY( 50 ) )
+	end
+
+	
+
+	function ServerLabel:LoadContents()
+		local surface = surface
+		local pnl = self
+
+		surface.SetFont( "FLib.Menu.Config.ModulePanel.RealmLabel" )
+		local line_start = surface.GetTextSize( "CLIENT" ) + scaleX( 15 ) -- 5 + 10 because the text starts 5 pixels out
+		function pnl:Paint( w, h )
+			draw.DrawText( "SERVER", "FLib.Menu.Config.ModulePanel.RealmLabel", scaleX( 5 ), scaleY( 10 ), Color( 0, 0, 0, 255 ), TEXT_ALIGN_LEFT )
+			draw.RoundedBox( 10, line_start, scaleY( 20 ), (scaleX(662)-line_start), scaleY( 11 ), Color( 0, 0, 0, 255 ) )
+		end
+	end
+
+	local ClientLabel = {}
+	function ClientLabel:Init()
+		self:SetSize( scaleX( 670 ), scaleY( 50 ) )
+	end
+
+	
+
+	function ClientLabel:LoadContents()
+		local surface = surface
+		local pnl = self
+
+		surface.SetFont( "FLib.Menu.Config.ModulePanel.RealmLabel" )
+		local line_start = surface.GetTextSize( "CLIENT" ) + scaleX( 15 ) -- 5 + 10 because the text starts 5 pixels out
+		function pnl:Paint( w, h )
+			draw.DrawText( "CLIENT", "FLib.Menu.Config.ModulePanel.RealmLabel", scaleX( 5 ), scaleY( 10 ), Color( 0, 0, 0, 255 ), TEXT_ALIGN_LEFT )
+			draw.RoundedBox( 10, line_start, scaleY( 20 ), (scaleX(662)-line_start), scaleY( 11 ), Color( 0, 0, 0, 255 ) )
+		end
+	end
+
+	local locked = false
+
 	function expandButton:DoClick()
-		if isExpanding then -- don't let multiple animations happen at once, that might not be the most ideal
+		local CurmodulePanel = self:GetParent()
+		local modname = CurmodulePanel.title
+		if locked then -- don't let multiple animations happen at once, that might cause problems
+			return
+		elseif CurmodulePanel.expanded then
+			locked = true
+			local curslot = CurmodulePanel.slot
+			local _, h = CurmodulePanel:GetSize()
+			CurmodulePanel:SizeTo( scaleX( 700 ), scaleY( 43 ), 0.2, 0, -1, function()
+				locked = false
+				CurmodulePanel.expanded = false
+			end )
+			local diff = h - scaleY( 43 )
+				for modname, panel in pairs( FLib.Menu.ActivePanels["Config"] ) do
+					if panel.slot > curslot then
+						local x, y = panel:GetPos()
+						panel:MoveTo( x, y-diff, 0.2, 0, -1, function()
+							
+						end )
+					end
+				end
 			return
 		end
-		local CurmodulePanel = self:GetParent()
-		CurmodulePanel.ConfigItems = {}
-		for identifier, value in pairs( cfgTable ) do
-			if type(value) == "table" then
-				local CategoryPanel = vgui.Create( "FLib.Menu.Config.CategoryDivider", CurmodulePanel )
-				table.insert( CurmodulePanel.ConfigItems, CategoryPanel )
-				for subidentifier, value in pairs( CurmodulePanel.ConfigItems ) do
-
+		if not FLib.Menu.ActivePanels.Config[modname].items then -- check if the config module has already been loaded (don't dupe minimized items)
+			local expansion, locked = 0, true
+			local clientCFG, serverCFG = CurmodulePanel.clientCFG, CurmodulePanel.serverCFG
+			FLib.Menu.ActivePanels.Config[modname].items = {}
+			if clientCFG then
+				local lblpnl = vgui.Create( "FLib.Menu.Config.CategoryDivider.Client", FLib.Menu.ActivePanels.Config[modname] )
+				lblpnl:LoadContents()
+				table.insert( FLib.Menu.ActivePanels.Config[modname].items, lblpnl )
+				for cfgID, properties in pairs( clientCFG ) do
+					local pnl = vgui.Create( "FLib.Menu.Config.Item.ConfigItem", FLib.Menu.ActivePanels.Config[modname] )
+					pnl:LoadContents( cfgID, properties )
+					table.insert( FLib.Menu.ActivePanels.Config[modname].items, pnl )
 				end
-			else
-
+			end
+			if serverCFG then
+				local lblpnl = vgui.Create( "FLib.Menu.Config.CategoryDivider.Server", FLib.Menu.ActivePanels.Config[modname] )
+				lblpnl:LoadContents()
+				table.insert( FLib.Menu.ActivePanels.Config[modname].items, lblpnl )
+				for cfgID, properties in pairs( serverCFG ) do
+					local pnl = vgui.Create( "FLib.Menu.Config.Item.ConfigItem", FLib.Menu.ActivePanels.Config[modname] )
+					pnl:LoadContents( cfgID, properties )
+					table.insert( FLib.Menu.ActivePanels.Config[modname].items, pnl )
+				end
 			end
 		end
+		
 
+
+		local modItems = FLib.Menu.ActivePanels.Config[modname].items
+
+		local x, y = scaleX( 15 ), scaleY( 50 )
+		local expand = 0
+		for order, panel in pairs( modItems ) do
+			local w, h = panel:GetSize()
+			panel:SetPos( x, y+expand )
+			expand = expand + h + scaleY( 5 )
+			panel:Show( )
+		end
+		local _, bottom = modItems[#modItems]:GetPos()
+		local _, height = modItems[#modItems]:GetSize()
+		bottom = bottom + scaleY( height )
+
+		-- move panels below out of the way
 		local curSlot = CurmodulePanel.slot
 		for modname, panel in pairs( FLib.Menu.ActivePanels["Config"] ) do
-			if panel.slot > buttonSlot then
+			if panel.slot > curSlot then
 				local x, y = panel:GetPos()
-				panel:MoveTo( x, y+expansion  )
+				panel:MoveTo( x, y+bottom+scaleY( 7 ), 0.2, 0, -1 )
 			end
+		end
+
+		FLib.Menu.ActivePanels.Config[modname]:SizeTo( scaleX( 700 ), bottom + scaleY( 50 ), 0.2, 0, -1, function()
+			FLib.Menu.ActivePanels.Config[modname].expanded = true
+			locked = false
+		end )
+
+		
+	end
+
+	local itemBase = {}
+	function itemBase:Init()
+		self:SetPos( scaleX( 5 ), scaleY( 5 ) )
+		self:SetSize( scaleX( 125 ), scaleY( 25 ) )
+	end
+
+	function itemBase:Load( properties )
+		print("this shit working?")
+	end
+
+	function itemBase:Paint( w, h ) -- template
+		draw.RoundedBox( 8, 0, 0, w, h, Color( 0, 0, 0, 255 ) )
+	end
+
+	local numberBox = itemBase
+	local boolBox = itemBase
+	local textBox = itemBase
+	local categoryBox = itemBase
+	function categoryBox:Load( properties )
+		print("category box loaded")
+	end
+
+	function categoryBox:Paint( w, h )
+		draw.RoundedBox( 8, 0, 0, w, h, Color( 0, 0, 255, 255 ) )
+	end
+
+	function boolBox:Load( properties )
+		print("bool box loaded")
+	end
+
+	function boolBox:Paint( w, h ) -- template
+		draw.RoundedBox( 8, 0, 0, w, h, Color( 0, 255, 0, 255 ) )
+	end
+
+	function textBox:Load( properties )
+
+	end
+
+	function numberBox:Load( properties )
+
+	end
+
+
+	local typeDraw = {
+		bool = "Bool",
+		number = "Number",
+		text = "Text",
+		list = "Base",
+		category = "Category"
+	}
+
+
+	local ConfigItem = {}
+	function ConfigItem:Init()
+		self:Hide()
+		self:SetSize( scaleX( 670 ), scaleY( 35 ) )
+	end
+
+	function ConfigItem:LoadContents( cfgID, properties ) -- make the VGUI items and label text
+		local pnl = self
+		local input
+		local itemType = typeDraw[properties.type]
+
+		if itemType then
+			input = vgui.Create( "FLib.Menu.Config.Item."..itemType, self )
+
+			input:Load( properties )
+		else
+			FLib.Func.DPrint("Config property type invalid (lua error). Invalid property type: '"..properties.type.."'")
+			input = vgui.Create( "FLib.Menu.Config.Item.Base", self )
+		end
+
+
+		
+		function pnl:Paint()
+			local w, h = self:GetSize()
+			draw.RoundedBox( 5, 0, 0, w, h, Color( 255, 0, 0, 255 ) )
 		end
 	end
 
-	local ConfigCategory = {}
-	function ConfigCategory:Init()
-
-	end
-
-	function ConfigCategory:Paint()
-
-	end
-
-	vgui.Register( "FLib.Menu.Config.Item.Category", ConfigCategory, "Panel" )
+	vgui.Register( "FLib.Menu.Config.Item.Text", textBox, "DTextEntry" )
+	vgui.Register( "FLib.Menu.Config.Item.Number", numberBox, "DTextEntry" )
+	vgui.Register( "FLib.Menu.Config.Item.Bool", boolBox, "DButton" )
+	vgui.Register( "FLib.Menu.Config.Item.Category", categoryBox, "Panel" )
+	vgui.Register( "FLib.Menu.Config.Item.Base", itemBase, "Panel" )
+	vgui.Register( "FLib.Menu.Config.CategoryDivider.Server", ServerLabel, "Panel" )
+	vgui.Register( "FLib.Menu.Config.CategoryDivider.Client", ClientLabel, "Panel" )
+	vgui.Register( "FLib.Menu.Config.Item.ConfigItem", ConfigItem, "Panel" )
 	vgui.Register( "FLib.Menu.Config.ModulePanelExpand", expandButton, "DButton" )
 	vgui.Register( "FLib.Menu.Config.ModulePanel", modulePanel, "Panel" )
 
+	
 	FLib.HotLoad.SourceInSequence( "MenuButtons", {
 		{ "main", "https://i.imgur.com/695Hxjv.png", "png", 
 			function() -- on success function
-				FLib.Menu.AddPage( "main", "MAIN", FLib.Resources["main"], mainPanel )
+				FLib.Menu.AddPage( "main", "MAIN", FLib.Resources["main"], mainPanel ) -- exampl
 			end 
 		},
 		{ "manage", "https://i.imgur.com/I10A7NH.png", "png", 
@@ -739,7 +945,6 @@ those who are managing server rather than merely playing it]]
 			end
 		}
 	} )
-
 
 end
 

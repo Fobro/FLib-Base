@@ -27,7 +27,7 @@ end
 
 ------------------------------------------
 --[[
-	Player loaded hook
+	Player Loaded Hook
 --]]
 
 -- note: this is a way to make sure networking is operational
@@ -93,7 +93,7 @@ if CLIENT then
 				elseif FLib.Resources["loadingIcon"] then
 					FLib.Resources[identifier] = Material( FLib.Resources["loadingIcon"]:GetTexture( "$basetexture" ):GetName() )
 				else
-					FLib.Resources[identifier] = Material( "phoenix_storms/wood" )
+					FLib.Resources[identifier] = Material( "icon16/user.png" )
 				end
 				return FLib.Resources[identifier] -- lord knows why, but returning this into itself causes it to actually set the value... Nice? IG?
 			end,
@@ -105,16 +105,14 @@ if CLIENT then
 		material = {
 			load = function( path, identifier, filetype )
 				if string.lower(filetype) == "vtf" then -- if vtf, mark the identifier
-					if FLib.Resources[identifier]:GetTexture( "$basetexture" ) == "models/wireframe" then -- if it isn't plain prepared material (this is default installed)
-						FLib.Resources[identifier] = path
+					if not FLib.Resources[identifier] then
+						FLib.Resources[identifier] = Material( path )
 					else
 						FLib.Resources[identifier]:SetTexture( "$basetexture", path )
 					end
-				else -- only VMT is possible
-					if type( FLib.Resources[identifier] ) == "string" then
-						local vmt = Material( path )
-						vmt:SetTexture( "$basetexture", FLib.Resources[identifier]:GetTexture( "$basetexture" ):GetName() )
-						FLib.Resources[identifier] = vmt
+				else -- if vmt
+					if FLib.Resources[identifier] then
+						FLib.Resources[identifier] = Material( path ):SetTexture( "$basetexture", FLib.Resources[identifier]:GetTexture( "$basetexture"):GetName() )
 					else
 						FLib.Resources[identifier] = Material( path )
 					end
@@ -137,7 +135,14 @@ if CLIENT then
 					pitch = {95, 110},
 					sound = path
 				} )
-				return identifier
+				sound.PlayFile( path, "noplay", function( soundObj, errCode, errStr )
+					if ( IsValid( soundObj ) ) then
+						FLib.Resources[identifier] = soundObj
+					else
+						FLib.Func.Print( "Error activating downloaded sound! CODE: "..errCode..". REASON: "..errStr.."." )
+					end
+				end )
+				return FLib.Resources[identifier]
 			end
 		},
 		data = function( path, identifier, filetype )
@@ -172,7 +177,6 @@ if CLIENT then
 		local path = "flib/hotload/"..extensionTypes[extension].."/" .. urlHash .. "." .. extension
 		if file.Exists( path, "DATA" ) then
 			if TypeFunctions[extensionTypes[extension]]["prepare"] then -- if the load function updates a filler item (i.e. updating a material texture)
-				print("preparing already installed material")
 				FLib.Resources[identifier] = TypeFunctions[extensionTypes[extension]]["prepare"]( identifier, filetype )
 			end
 			FLib.Resources[identifier] = TypeFunctions[extensionTypes[extension]]["load"]( "data/"..path, identifier, filetype )
@@ -181,7 +185,6 @@ if CLIENT then
 			end
 		else
 			if TypeFunctions[extensionTypes[extension]]["prepare"] then -- if it needs to prep a value before
-				print("preparing for downloaded material")
 				FLib.Resources[identifier] = TypeFunctions[extensionTypes[extension]]["prepare"]( identifier, filetype )
 			end
 			http.Fetch( url, 
@@ -293,6 +296,7 @@ if CLIENT then
 		surface.CreateFont( name, properties )
 	end
 
-
+	scaleX = scaleDraw.ScaleX
+	scaleY = scaleDraw.ScaleY
 
 end
