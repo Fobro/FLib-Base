@@ -49,7 +49,7 @@ function FLib.Func.Print( message, errorBool )
 		MsgC( Color( 255, 170, 0 ), "[FLib] "..message.."\n" )
 	end
 end
-
+  
 ------------------------------------------
 --[[
 	Debugging
@@ -195,6 +195,15 @@ FLib.Config.LocatedModules[FLib.Info.Realm] = {}
 
 function FLib.Config.SaveConfig() -- saves config for whatever realm runs it (run on both if the change should be applied to both)
 	file.Write( "flib/"..FLib.Info.Realm.."config.json", util.TableToJSON( FLib.Config[FLib.Info.Realm] ) )
+	if FLib.Info.Realm == "Server" then
+		for key, ply in pairs( player.GetAll() ) do
+			if ply:IsAdmin() then
+				net.Start( "FLib.Config.ServConf" )
+					net.WriteTable( FLib.Config.Server )
+				net.Send( ply )
+			end
+		end
+	end
 end
 
 function FLib.Config.Register( modname, realm, cfgTable ) -- this should only be used by addons initiated through FLib file structure (through an autorun.lua file located in modules/)
@@ -208,8 +217,9 @@ function FLib.Config.Register( modname, realm, cfgTable ) -- this should only be
 	end
 end
 
-function FLib.Config.ChangeConfig( modname, realm, key, value ) -- modifies and saves the table to disk (for FLib Menu)
-	FLib.Config[FLib.Info.Realm][modname][key].storedval = value
+function FLib.Config.ChangeConfig( modname, cfgID, value ) -- modifies and saves the table to disk (for FLib Menu)
+	FLib.Config[FLib.Info.Realm][modname][cfgID].storedval = value
+	FLib.Config.SaveConfig()
 end
 
 function FLib.Config.LoadConfig( modname ) -- returns pre-indexed config value table (only stored values)
@@ -249,15 +259,13 @@ if CLIENT then
 end
 
 FLib.Config.Register( "main", "client", {
-	["CATEGORY_DEBUG"] = { type = "category", display = "Debug" },
 	["DebugGeneral"] = { type = "bool", default = false, label = "Enable/Disable Debug Messaging" },
 	["DebugTransmit"] = { type = "bool", default = false, label = "Enable/Disable Server Debug Broadcast to Admins" }
 } )
 
 FLib.Config.Register( "main", "server", {
-	["CATEGORY_TEST"] = { type = "category", display = "Debug" },
 	["Testone"] = { type = "bool", default = false, label = "Enable/Disable Debug Messaging" },
-	["TestTwo"] = { type = "bool", default = false, label = "Enable/Disable Server Debug Broadcast to Admins" }
+	["TestTwo"] = { type = "text", default = false, label = "Enable/Disable Server Debug Broadcast to Admins" }
 } )
 
 ------------------------------------------

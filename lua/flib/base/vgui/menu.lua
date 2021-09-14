@@ -93,6 +93,7 @@ if CLIENT then
 	scaleDraw.CreateFont( "FLib.Menu.Dev.LuaEnvironment.Buttons", { size = 21, weight = 1000, font = "Calibri" } )
 	scaleDraw.CreateFont( "FLib.Menu.Config.ModulePanel.Title", { size = 25, font = "Stratum2 MD" } )
 	scaleDraw.CreateFont( "FLib.Menu.Config.ModulePanel.RealmLabel", { size = 30, weight = 750, font = "Courier New" } )
+	scaleDraw.CreateFont( "FLib.Menu.Config.ConfigLabel", { size = 18, weight = 1000, font = "Tahoma" } )
 
 
 	FLib.Menu = {}
@@ -632,7 +633,8 @@ those who are managing server rather than merely playing it]]
 	local pnlBSlot = {}
 	local expansion = 0
 	function configPanel:OnSelect()
-		FLib.Menu.ActivePanels["Config"] = {}
+		FLib.Menu.ActivePanels["Config"] = { }
+		FLib.Menu.ActivePanels["ActiveConfigItems"] = {}
 		local slot = 0 -- iterator
 		for mod, cfgTable in pairs( FLib.Config.Client ) do
 			slot = slot + 1
@@ -826,48 +828,89 @@ those who are managing server rather than merely playing it]]
 		
 	end
 
-	local itemBase = {}
+	local itemBase = {} -- example
 	function itemBase:Init()
+		self:Hide()
+		
+
 		self:SetPos( scaleX( 5 ), scaleY( 5 ) )
 		self:SetSize( scaleX( 125 ), scaleY( 25 ) )
+
+		function self:Load( properties )
+			function self:Paint( w, h ) -- template
+				draw.RoundedBox( 8, 0, 0, w, h, Color( 100, 100, 100, 255 ) )
+			end
+			self:Show()
+		end
 	end
 
-	function itemBase:Load( properties )
-		print("this shit working?")
+	local boolBox = {}
+	function boolBox:Init()
+		self:Hide()
+		self.slider = vgui.Create( "FLib.Menu.Config.BoolSlider", self )
+		self:SetPos( scaleX( 5 ), scaleY( 5 ) )
+		self:SetSize( scaleX( 125 ), scaleY( 25 ) )
+
+		function self:Load( properties )
+			function self:Paint( w, h ) -- template
+				draw.RoundedBox( 8, 0, 0, w, h, Color( 100, 100, 100, 255 ) ) -- background grey
+				draw.RoundedBox( 8, (w/2)-scaleX( 10 ), scaleY( 5 ), (w/2), h - scaleY( 10 ), Color( 52, 235, 122, 255 ) ) -- green indicator (on)
+				draw.RoundedBox( 8, scaleX( 10 ), scaleY( 5 ), (w/2), h - scaleY( 10 ), Color( 230, 77, 67, 255 ) ) -- red indicator (off) 
+				if not properties.storedval then
+					self.slider:SetPos( scaleX( 45 ), scaleY( 5 ) )
+				end
+			end
+			self:SetText("")
+			self:Show()
+		end
 	end
 
-	function itemBase:Paint( w, h ) -- template
-		draw.RoundedBox( 8, 0, 0, w, h, Color( 0, 0, 0, 255 ) )
+	local boolSlider = {}
+	function boolSlider:Init()
+		self:SetSize( scaleX( 75 ), scaleY( 15 ) )
+		self:SetPos( scaleX( 9 ), scaleY( 5 ) )
+		self:SetText("")
 	end
 
-	local numberBox = itemBase
-	local boolBox = itemBase
-	local textBox = itemBase
-	local categoryBox = itemBase
-	function categoryBox:Load( properties )
-		print("category box loaded")
+	function boolSlider:Paint( w, h )
+		draw.RoundedBox( 8, 0, 0, w, h, Color( 0, 0, 0, 255 ) ) -- black slider
 	end
 
-	function categoryBox:Paint( w, h )
-		draw.RoundedBox( 8, 0, 0, w, h, Color( 0, 0, 255, 255 ) )
+	function boolSlider:DoClick()
+		self:GetParent():DoClick() -- redirect click to parent
+	end
+	
+	local textBox = {}
+	function textBox:Init()
+		self:Hide()
+
+
+		self:SetPos( scaleX( 5 ), scaleY( 5 ) )
+		self:SetSize( scaleX( 125 ), scaleY( 25 ) )
+
+		function self:Load( properties )
+			function self:Paint( w, h ) -- template
+				draw.RoundedBox( 8, 0, 0, w, h, Color( 100, 100, 100, 255 ) )
+			end
+
+			self:Show()
+		end
 	end
 
-	function boolBox:Load( properties )
-		print("bool box loaded")
+	local numberBox = {}
+	function numberBox:Init()
+		self:Hide()
+
+		self:SetPos( scaleX( 5 ), scaleY( 5 ) )
+		self:SetSize( scaleX( 125 ), scaleY( 25 ) )
+
+		function self:Load( properties )
+			function self:Paint( w, h ) -- template
+				draw.RoundedBox( 8, 0, 0, w, h, Color( 100, 100, 100, 255 ) )
+			end
+			self:Show()
+		end
 	end
-
-	function boolBox:Paint( w, h ) -- template
-		draw.RoundedBox( 8, 0, 0, w, h, Color( 0, 255, 0, 255 ) )
-	end
-
-	function textBox:Load( properties )
-
-	end
-
-	function numberBox:Load( properties )
-
-	end
-
 
 	local typeDraw = {
 		bool = "Bool",
@@ -876,7 +919,17 @@ those who are managing server rather than merely playing it]]
 		list = "Base",
 		category = "Category"
 	}
+	local typeLoad = {
+		bool = function( cfgID, properties )
 
+		end,
+		number = function( cfgID, properties )
+
+		end,
+		text = function( cfgID, properties )
+
+		end
+	}
 
 	local ConfigItem = {}
 	function ConfigItem:Init()
@@ -886,15 +939,13 @@ those who are managing server rather than merely playing it]]
 
 	function ConfigItem:LoadContents( cfgID, properties ) -- make the VGUI items and label text
 		local pnl = self
-		local input
+		
 		local itemType = typeDraw[properties.type]
-
 		if itemType then
-			input = vgui.Create( "FLib.Menu.Config.Item."..itemType, self )
-
-			input:Load( properties )
+			FLib.Menu.ActivePanels.ActiveConfigItems[cfgID] = vgui.Create( "FLib.Menu.Config.Item."..itemType, self )
+			FLib.Menu.ActivePanels.ActiveConfigItems[cfgID]:Load( properties )
 		else
-			FLib.Func.DPrint("Config property type invalid (lua error). Invalid property type: '"..properties.type.."'")
+			FLib.Func.DPrint(" Config property type invalid (lua error). Invalid property type: '"..properties.type.."'", true )
 			input = vgui.Create( "FLib.Menu.Config.Item.Base", self )
 		end
 
@@ -902,14 +953,17 @@ those who are managing server rather than merely playing it]]
 		
 		function pnl:Paint()
 			local w, h = self:GetSize()
-			draw.RoundedBox( 5, 0, 0, w, h, Color( 255, 0, 0, 255 ) )
+			draw.RoundedBox( 5, 0, 0, w, h, Color( 0, 0, 255, 50 ) )
+			draw.DrawText( properties.label, "FLib.Menu.Config.ConfigLabel", scaleX(140), scaleY(8), Color( 0, 0, 0, 255 ), TEXT_ALIGN_LEFT )
 		end
+
+		self:Show()
 	end
 
+	vgui.Register( "FLib.Menu.Config.BoolSlider", boolSlider, "DButton" )
 	vgui.Register( "FLib.Menu.Config.Item.Text", textBox, "DTextEntry" )
 	vgui.Register( "FLib.Menu.Config.Item.Number", numberBox, "DTextEntry" )
 	vgui.Register( "FLib.Menu.Config.Item.Bool", boolBox, "DButton" )
-	vgui.Register( "FLib.Menu.Config.Item.Category", categoryBox, "Panel" )
 	vgui.Register( "FLib.Menu.Config.Item.Base", itemBase, "Panel" )
 	vgui.Register( "FLib.Menu.Config.CategoryDivider.Server", ServerLabel, "Panel" )
 	vgui.Register( "FLib.Menu.Config.CategoryDivider.Client", ClientLabel, "Panel" )
